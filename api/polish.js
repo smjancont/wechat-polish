@@ -1,6 +1,6 @@
 /**
  * 微信文案润色 — Vercel Serverless Function
- * 接收前端请求，调用 DeepSeek API 进行文案润色
+ * 接收前端请求，调用通义千问 API 进行文案润色
  */
 
 // 风格对应的 Prompt 配置
@@ -73,22 +73,22 @@ export default async function handler(req, res) {
 
     const styleConfig = STYLE_PROMPTS[style] || STYLE_PROMPTS.friendly;
 
-    // 调用 DeepSeek API
-    const apiKey = process.env.DEEPSEEK_API_KEY;
+    // 调用通义千问 API（阿里云 DashScope）
+    const apiKey = process.env.DASHSCOPE_API_KEY;
     if (!apiKey) {
       return res.status(500).json({ error: '服务未配置 API Key，请联系管理员' });
     }
 
     const systemPrompt = `${styleConfig.prompt}\n\n请只输出润色后的文字，不要加任何解释或前缀。`;
 
-    const apiResponse = await fetch('https://api.deepseek.com/v1/chat/completions', {
+    const apiResponse = await fetch('https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'deepseek-chat',
+        model: 'qwen-turbo',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: `需要润色的原文：\n${text.trim()}` },
@@ -100,7 +100,7 @@ export default async function handler(req, res) {
 
     if (!apiResponse.ok) {
       const errBody = await apiResponse.text();
-      console.error('DeepSeek API 错误:', apiResponse.status, errBody);
+      console.error('通义千问 API 错误:', apiResponse.status, errBody);
       return res.status(502).json({ error: 'AI 服务暂时不可用，请稍后再试' });
     }
 
