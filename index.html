@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>微信文案助手 - AI 聊天润色</title>
+  <style>
+    :root {
+      --wechat-green: #07C160;
+      --wechat-bg: #EDEDED;
+      --bubble-self: #95EC69;
+      --bubble-other: #FFFFFF;
+      --text-primary: #1A1A1A;
+      --text-secondary: #999999;
+      --border: #E0E0E0;
+      --danger: #FA5151;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB",
+        "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif;
+      background: var(--wechat-bg);
+      min-height: 100vh;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    /* ====== 顶部导航栏 ====== */
+    .header {
+      background: var(--wechat-green);
+      color: white;
+      padding: 12px 16px;
+      text-align: center;
+      font-size: 17px;
+      font-weight: 600;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    /* ====== 主内容区 ====== */
+    .container {
+      max-width: 500px;
+      margin: 0 auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* ====== 聊天区域 ====== */
+    .chat-area {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-height: 200px;
+    }
+
+    .bubble {
+      max-width: 85%;
+      padding: 12px 14px;
+      border-radius: 8px;
+      font-size: 15px;
+      line-height: 1.6;
+      word-break: break-word;
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .bubble.user {
+      align-self: flex-end;
+      background: var(--bubble-self);
+      color: var(--text-primary);
+    }
+
+    .bubble.ai {
+      align-self: flex-start;
+      background: var(--bubble-other);
+      color: var(--text-primary);
+      position: relative;
+    }
+
+    .bubble.placeholder {
+      align-self: flex-start;
+      background: var(--bubble-other);
+      color: var(--text-secondary);
+      font-style: italic;
+    }
+
+    /* ====== 输入区 ====== */
+    .input-card {
+      background: white;
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+    }
+
+    .input-label {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 80px;
+      max-height: 200px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 15px;
+      line-height: 1.5;
+      resize: none;
+      outline: none;
+      font-family: inherit;
+      transition: border-color 0.2s;
+      user-select: text;
+    }
+
+    textarea:focus {
+      border-color: var(--wechat-green);
+      box-shadow: 0 0 0 2px rgba(7,193,96,0.15);
+    }
+
+    /* ====== 风格选择 ====== */
+    .style-section {
+      background: white;
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+    }
+
+    .style-label {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 10px;
+    }
+
+    .style-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .style-btn {
+      padding: 10px 8px;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      background: white;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+      font-family: inherit;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .style-btn:active {
+      transform: scale(0.97);
+    }
+
+    .style-btn.active {
+      border-color: var(--wechat-green);
+      background: #F0FFF4;
+      color: var(--wechat-green);
+      font-weight: 500;
+    }
+
+    /* ====== 优化按钮 ====== */
+    .btn-polish {
+      width: 100%;
+      padding: 14px;
+      background: var(--wechat-green);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: inherit;
+      letter-spacing: 1px;
+    }
+
+    .btn-polish:active {
+      transform: scale(0.98);
+      opacity: 0.9;
+    }
+
+    .btn-polish:disabled {
+      background: #B0B0B0;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-polish.loading {
+      pointer-events: none;
+    }
+
+    /* ====== 结果区操作按钮 ====== */
+    .result-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-copy, .btn-retry {
+      flex: 1;
+      padding: 10px;
+      border: 1.5px solid var(--wechat-green);
+      border-radius: 8px;
+      background: white;
+      color: var(--wechat-green);
+      font-size: 14px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.2s;
+    }
+
+    .btn-copy:active, .btn-retry:active {
+      background: #F0FFF4;
+    }
+
+    .btn-copy.copied {
+      background: var(--wechat-green);
+      color: white;
+    }
+
+    /* ====== 提示消息 ====== */
+    .toast {
+      position: fixed;
+      top: 60px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.75);
+      color: white;
+      padding: 10px 20px;
+      border-radius: 20px;
+      font-size: 14px;
+      z-index: 999;
+      animation: toastIn 0.3s ease;
+      pointer-events: none;
+    }
+
+    @keyframes toastIn {
+      from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+      to { opacity: 1; transform: translateX(-50%) translateY(0); }
+    }
+
+    /* ====== 加载动画 ====== */
+    .spinner {
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .typing-dots {
+      display: flex;
+      gap: 4px;
+      padding: 4px 0;
+    }
+
+    .typing-dots span {
+      width: 7px;
+      height: 7px;
+      background: var(--text-secondary);
+      border-radius: 50%;
+      animation: bounce 1.4s infinite ease-in-out both;
+    }
+
+    .typing-dots span:nth-child(1) { animation-delay: -0.32s; }
+    .typing-dots span:nth-child(2) { animation-delay: -0.16s; }
+
+    @keyframes bounce {
+      0%, 80%, 100% { transform: scale(0.6); }
+      40% { transform: scale(1); }
+    }
+
+    /* ====== 底部说明 ====== */
+    .footer {
+      text-align: center;
+      padding: 16px;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 顶部 -->
+  <div class="header">💬 微信文案助手</div>
+  <div id="toast" class="toast" style="display:none;"></div>
+
+  <div class="container">
+
+    <!-- 聊天预览区 -->
+    <div class="chat-area" id="chatArea">
+      <div class="bubble placeholder" id="placeholderBubble">
+        👋 在这里输入你想说的话，我帮你润色得更得体、更自然~
+      </div>
+    </div>
+
+    <!-- 输入卡片 -->
+    <div class="input-card">
+      <div class="input-label">📝 输入你想说的话</div>
+      <textarea
+        id="inputText"
+        placeholder="例如：老板，这个方案我觉得不太行，有点问题…"
+        maxlength="500"
+      ></textarea>
+      <div style="text-align:right;font-size:12px;color:var(--text-secondary);margin-top:6px;">
+        <span id="charCount">0</span>/500
+      </div>
+    </div>
+
+    <!-- 风格选择 -->
+    <div class="style-section">
+      <div class="style-label">🎨 选择润色风格</div>
+      <div class="style-grid">
+        <button class="style-btn active" data-style="friendly">😊 亲切随和</button>
+        <button class="style-btn" data-style="formal">💼 正式商务</button>
+        <button class="style-btn" data-style="humorous">😄 幽默风趣</button>
+        <button class="style-btn" data-style="concise">⚡ 简洁直接</button>
+      </div>
+    </div>
+
+    <!-- 优化按钮 -->
+    <button class="btn-polish" id="btnPolish" onclick="polish()">
+      ✨ 智能润色
+    </button>
+
+    <!-- 结果区操作 -->
+    <div class="result-actions" id="resultActions" style="display:none;">
+      <button class="btn-copy" id="btnCopy" onclick="copyResult()">📋 一键复制</button>
+      <button class="btn-retry" onclick="polish()">🔄 换一种说法</button>
+    </div>
+
+    <div class="footer">
+      文案由 AI 生成 · 注意核实重要信息
+    </div>
+  </div>
+
+  <script>
+    let currentStyle = 'friendly';
+    let currentResult = '';
+
+    // ====== 风格选择 ======
+    document.querySelectorAll('.style-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        document.querySelectorAll('.style-btn').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        currentStyle = this.dataset.style;
+      });
+    });
+
+    // ====== 字数统计 ======
+    const inputText = document.getElementById('inputText');
+    const charCount = document.getElementById('charCount');
+    inputText.addEventListener('input', () => {
+      charCount.textContent = inputText.value.length;
+    });
+
+    // ====== 核心：润色请求 ======
+    async function polish() {
+      const text = inputText.value.trim();
+      if (!text) {
+        showToast('请先输入要润色的文字~');
+        inputText.focus();
+        return;
+      }
+
+      const btnPolish = document.getElementById('btnPolish');
+      const chatArea = document.getElementById('chatArea');
+      const placeholderBubble = document.getElementById('placeholderBubble');
+      const resultActions = document.getElementById('resultActions');
+
+      // 输入态
+      setLoading(true);
+
+      // 显示用户消息气泡
+      hidePlaceholder();
+      removeOldBubbles();
+      addBubble('user', text);
+
+      // 显示输入中动画
+      const typingBubble = addTypingBubble();
+
+      try {
+        const response = await fetch('/api/polish', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, style: currentStyle }),
+        });
+
+        if (!response.ok) {
+          const err = await response.json().catch(() => ({}));
+          throw new Error(err.error || `请求失败 (${response.status})`);
+        }
+
+        const data = await response.json();
+        currentResult = data.result;
+
+        // 移除输入中动画，显示结果
+        typingBubble.remove();
+        addBubble('ai', currentResult);
+        resultActions.style.display = 'flex';
+        document.getElementById('btnCopy').classList.remove('copied');
+        document.getElementById('btnCopy').textContent = '📋 一键复制';
+
+      } catch (err) {
+        typingBubble.remove();
+        addBubble('ai', '😅 抱歉，润色失败了：' + err.message + '\n\n请检查网络后重试~');
+        resultActions.style.display = 'none';
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    function setLoading(loading) {
+      const btn = document.getElementById('btnPolish');
+      if (loading) {
+        btn.disabled = true;
+        btn.classList.add('loading');
+        btn.innerHTML = '<span class="spinner"></span>正在润色中…';
+      } else {
+        btn.disabled = false;
+        btn.classList.remove('loading');
+        btn.innerHTML = '✨ 智能润色';
+      }
+    }
+
+    // ====== 复制结果 ======
+    async function copyResult() {
+      if (!currentResult) return;
+      try {
+        await navigator.clipboard.writeText(currentResult);
+        const btnCopy = document.getElementById('btnCopy');
+        btnCopy.classList.add('copied');
+        btnCopy.textContent = '✅ 已复制';
+        showToast('已复制到剪贴板，去微信粘贴吧~');
+        setTimeout(() => {
+          btnCopy.classList.remove('copied');
+          btnCopy.textContent = '📋 一键复制';
+        }, 2000);
+      } catch (err) {
+        // 降级方案：选中文字让用户手动复制
+        const range = document.createRange();
+        const sel = window.getSelection();
+        const aiBubble = document.querySelector('.bubble.ai:last-of-type');
+        if (aiBubble) {
+          range.selectNodeContents(aiBubble);
+          sel.removeAllRanges();
+          sel.addRange(range);
+        }
+        showToast('请长按选中文字后手动复制');
+      }
+    }
+
+    // ====== UI 辅助 ======
+    function addBubble(type, text) {
+      const bubble = document.createElement('div');
+      bubble.className = `bubble ${type}`;
+      bubble.textContent = text;
+      document.getElementById('chatArea').appendChild(bubble);
+      bubble.scrollIntoView({ behavior: 'smooth' });
+      return bubble;
+    }
+
+    function addTypingBubble() {
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble ai';
+      const dots = document.createElement('div');
+      dots.className = 'typing-dots';
+      dots.innerHTML = '<span></span><span></span><span></span>';
+      bubble.appendChild(dots);
+      document.getElementById('chatArea').appendChild(bubble);
+      bubble.scrollIntoView({ behavior: 'smooth' });
+      return bubble;
+    }
+
+    function hidePlaceholder() {
+      const ph = document.getElementById('placeholderBubble');
+      if (ph) ph.style.display = 'none';
+    }
+
+    function removeOldBubbles() {
+      const area = document.getElementById('chatArea');
+      const bubbles = area.querySelectorAll('.bubble.user, .bubble.ai');
+      if (bubbles.length >= 4) {
+        // 保留最近一对
+        for (let i = 0; i < bubbles.length - 2; i++) {
+          bubbles[i].remove();
+        }
+      }
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      toast.textContent = msg;
+      toast.style.display = 'block';
+      clearTimeout(toast._timeout);
+      toast._timeout = setTimeout(() => {
+        toast.style.display = 'none';
+      }, 2000);
+    }
+
+    // ====== 快捷粘贴（从微信剪贴板） ======
+    inputText.addEventListener('focus', async () => {
+      // 仅在输入框为空时尝试读取剪贴板
+      if (inputText.value.trim() === '') {
+        try {
+          const clipText = await navigator.clipboard.readText();
+          if (clipText && clipText.length <= 500 && clipText.trim() !== '') {
+            // 不自动粘贴，用户可以手动操作
+          }
+        } catch (e) {
+          // 忽略剪贴板错误
+        }
+      }
+    });
+  </script>
+</body>
+</html>

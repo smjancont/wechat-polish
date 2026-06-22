@@ -1,0 +1,12 @@
+{
+  "name": "wechat-polish",
+  "version": "1.0.0",
+  "description": "微信聊天文案润色助手 - AI 帮你优化聊天内容",
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel deploy --prod"
+  },
+  "keywords": ["wechat", "chat", "polish", "ai"],
+  "license": "MIT",
+  "dependencies": {}
+}
