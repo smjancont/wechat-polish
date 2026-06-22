@@ -364,6 +364,18 @@
   </div>
 
   <script>
+    // ====== 配置 ======
+    const API_KEY = 'sk-2kRmu7mAoFFsR1omH353C7D6HeL9IBA0838446E1711F1B8653693BAB399C5';
+    const API_URL = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions';
+
+    // 风格 Prompt
+    const STYLE_PROMPTS = {
+      friendly: `请将以下文字润色为"亲切随和"风格。要求：语气温暖友好，像朋友间聊天；可以适当使用"呀"、"哦"、"呢"等语气词；加入适当的表情符号（如😊、👋等）；保持原意不变，自然不生硬；适合微信日常聊天场景。`,
+      formal: `请将以下文字润色为"正式商务"风格。要求：语气正式专业，得体大方；使用敬语和规范的书面表达；结构清晰，逻辑通顺；适合职场沟通、客户交流场景；不使用表情符号。`,
+      humorous: `请将以下文字润色为"幽默风趣"风格。要求：语气轻松幽默，让人会心一笑；可以适当加入网络热梗或俏皮话；保持原意不变，不要太夸张；加入适当的表情包式表达（如😂、🤣等）；适合轻松的朋友聊天场景。`,
+      concise: `请将以下文字润色为"简洁直接"风格。要求：言简意赅，去掉冗余词句；一句话能说清绝不用两句；直接表达核心意思，不绕弯子；逻辑清晰，重点突出；适合快速沟通、通知类场景。`,
+    };
+
     let currentStyle = 'friendly';
     let currentResult = '';
 
@@ -383,7 +395,7 @@
       charCount.textContent = inputText.value.length;
     });
 
-    // ====== 核心：润色请求 ======
+    // ====== 核心：润色请求（直连通义千问） ======
     async function polish() {
       const text = inputText.value.trim();
       if (!text) {
@@ -393,37 +405,49 @@
       }
 
       const btnPolish = document.getElementById('btnPolish');
-      const chatArea = document.getElementById('chatArea');
-      const placeholderBubble = document.getElementById('placeholderBubble');
       const resultActions = document.getElementById('resultActions');
 
-      // 输入态
       setLoading(true);
-
-      // 显示用户消息气泡
       hidePlaceholder();
       removeOldBubbles();
       addBubble('user', text);
 
-      // 显示输入中动画
       const typingBubble = addTypingBubble();
 
+      const stylePrompt = STYLE_PROMPTS[currentStyle] || STYLE_PROMPTS.friendly;
+      const systemPrompt = stylePrompt + '\n\n请只输出润色后的文字，不要加任何解释或前缀。';
+
       try {
-        const response = await fetch('/api/polish', {
+        // 直连通义千问 API
+        const response = await fetch(API_URL, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text, style: currentStyle }),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + API_KEY,
+          },
+          body: JSON.stringify({
+            model: 'qwen-turbo',
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: '需要润色的原文：\n' + text },
+            ],
+            temperature: 0.8,
+            max_tokens: 1000,
+          }),
         });
 
         if (!response.ok) {
-          const err = await response.json().catch(() => ({}));
-          throw new Error(err.error || `请求失败 (${response.status})`);
+          const errText = await response.text();
+          throw new Error('AI服务请求失败，请稍后重试');
         }
 
         const data = await response.json();
-        currentResult = data.result;
+        currentResult = data.choices?.[0]?.message?.content?.trim();
 
-        // 移除输入中动画，显示结果
+        if (!currentResult) {
+          throw new Error('AI 返回为空，请重试');
+        }
+
         typingBubble.remove();
         addBubble('ai', currentResult);
         resultActions.style.display = 'flex';
@@ -466,7 +490,6 @@
           btnCopy.textContent = '📋 一键复制';
         }, 2000);
       } catch (err) {
-        // 降级方案：选中文字让用户手动复制
         const range = document.createRange();
         const sel = window.getSelection();
         const aiBubble = document.querySelector('.bubble.ai:last-of-type');
@@ -510,7 +533,6 @@
       const area = document.getElementById('chatArea');
       const bubbles = area.querySelectorAll('.bubble.user, .bubble.ai');
       if (bubbles.length >= 4) {
-        // 保留最近一对
         for (let i = 0; i < bubbles.length - 2; i++) {
           bubbles[i].remove();
         }
@@ -526,21 +548,6 @@
         toast.style.display = 'none';
       }, 2000);
     }
-
-    // ====== 快捷粘贴（从微信剪贴板） ======
-    inputText.addEventListener('focus', async () => {
-      // 仅在输入框为空时尝试读取剪贴板
-      if (inputText.value.trim() === '') {
-        try {
-          const clipText = await navigator.clipboard.readText();
-          if (clipText && clipText.length <= 500 && clipText.trim() !== '') {
-            // 不自动粘贴，用户可以手动操作
-          }
-        } catch (e) {
-          // 忽略剪贴板错误
-        }
-      }
-    });
   </script>
 </body>
 </html>
