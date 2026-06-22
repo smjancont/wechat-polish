@@ -367,6 +367,11 @@
     // ====== 配置 ======
     const API_KEY = 'sk-2kRmu7mAoFFsR1omH353C7D6HeL9IBA0838446E1711F1B8653693BAB399C5';
     const API_URL = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions';
+    // CORS 代理列表（依次尝试）
+    const CORS_PROXIES = [
+      'https://corsproxy.io/?',
+      'https://api.allorigins.win/raw?url=',
+    ];
 
     // 风格 Prompt
     const STYLE_PROMPTS = {
@@ -418,26 +423,43 @@
       const systemPrompt = stylePrompt + '\n\n请只输出润色后的文字，不要加任何解释或前缀。';
 
       try {
-        // 直连通义千问 API
-        const response = await fetch(API_URL, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + API_KEY,
-          },
-          body: JSON.stringify({
-            model: 'qwen-turbo',
-            messages: [
-              { role: 'system', content: systemPrompt },
-              { role: 'user', content: '需要润色的原文：\n' + text },
-            ],
-            temperature: 0.8,
-            max_tokens: 1000,
-          }),
-        });
+        // 尝试直连 + CORS 代理
+        let response = null;
+        let lastError = null;
 
-        if (!response.ok) {
-          const errText = await response.text();
+        // 先尝试直连
+        const urls = [API_URL];
+        for (const proxy of CORS_PROXIES) {
+          urls.push(proxy + encodeURIComponent(API_URL));
+        }
+
+        for (const url of urls) {
+          try {
+            response = await fetch(url, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + API_KEY,
+              },
+              body: JSON.stringify({
+                model: 'qwen-turbo',
+                messages: [
+                  { role: 'system', content: systemPrompt },
+                  { role: 'user', content: '需要润色的原文：\n' + text },
+                ],
+                temperature: 0.8,
+                max_tokens: 1000,
+              }),
+            });
+            if (response.ok) break;
+          } catch (e) {
+            lastError = e;
+            continue;
+          }
+        }
+
+        if (!response || !response.ok) {
+          const errText = response ? await response.text().catch(() => '') : '';
           throw new Error('AI服务请求失败，请稍后重试');
         }
 
